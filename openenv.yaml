@@ -1,0 +1,126 @@
+name: email-triage
+version: "1.0.0"
+description: >
+  A real-world email triage environment where an RL agent must classify,
+  prioritize, reply to, escalate, and archive emails across three difficulty
+  levels — easy, medium, and hard.
+
+tags:
+  - openenv
+  - email
+  - triage
+  - nlp
+  - customer-support
+
+benchmark: email-triage
+
+tasks:
+  - name: email-triage-easy
+    difficulty: easy
+    max_steps: 15
+    num_emails: 5
+    description: "Classify five unambiguous emails by category and priority."
+    reward_range: [-0.5, 1.0]
+
+  - name: email-triage-medium
+    difficulty: medium
+    max_steps: 30
+    num_emails: 6
+    description: "Classify, reply, escalate, and archive six mixed-difficulty emails."
+    reward_range: [-1.0, 1.5]
+
+  - name: email-triage-hard
+    difficulty: hard
+    max_steps: 40
+    num_emails: 8
+    description: >
+      Handle eight adversarial emails including phishing, security incidents,
+      and ambiguous multi-threaded conversations under time pressure.
+    reward_range: [-2.0, 2.0]
+
+observation_space:
+  type: dict
+  fields:
+    inbox:
+      type: list[Email]
+      description: "List of unprocessed emails visible to the agent"
+    current_email:
+      type: Email | null
+      description: "The email at the top of the inbox"
+    processed_count:
+      type: int
+    total_emails:
+      type: int
+    step_number:
+      type: int
+    last_action_result:
+      type: str
+      description: "Human-readable result of the previous action"
+    last_action_error:
+      type: str | null
+    task_description:
+      type: str
+    done:
+      type: bool
+
+action_space:
+  type: dict
+  actions:
+    classify:
+      fields: [email_id, category, priority]
+      description: "Assign category and priority to an email"
+    reply:
+      fields: [email_id, body]
+      description: "Send a reply to the email sender"
+    escalate:
+      fields: [email_id, reason]
+      description: "Escalate to a human agent with a reason"
+    archive:
+      fields: [email_id]
+      description: "Archive the email (removes from inbox)"
+    skip:
+      fields: [email_id]
+      description: "Move email to end of inbox without acting"
+    done:
+      fields: []
+      description: "Signal task completion"
+
+reward_function:
+  shaped: true
+  components:
+    - name: classify_correct
+      value: +0.15
+    - name: classify_wrong
+      value: -0.10
+    - name: reply_relevant
+      value: +0.20
+    - name: reply_to_spam
+      value: -0.05
+    - name: escalate_correct
+      value: +0.15
+    - name: escalate_wrong
+      value: -0.10
+    - name: archive_spam
+      value: +0.10
+    - name: archive_non_spam
+      value: -0.10
+    - name: completion_bonus
+      value: "+0.20 × final_score"
+    - name: step_penalty
+      value: -0.01
+
+environment:
+  server: FastAPI (server.py)
+  port: 7860
+  protocol: HTTP REST
+
+baseline_scores:
+  email-triage-easy:
+    gpt-4.1-mini: 0.82
+    random_agent: 0.12
+  email-triage-medium:
+    gpt-4.1-mini: 0.68
+    random_agent: 0.08
+  email-triage-hard:
+    gpt-4.1-mini: 0.55
+    random_agent: 0.05
