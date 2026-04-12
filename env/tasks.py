@@ -99,7 +99,7 @@ def grade_task1(actions_log: List[Dict[str, Any]]) -> float:
             classified[a["email_id"]] = a
 
     if not classified:
-        return 0.0
+        return 0.01
 
     total_score = 0.0
     for eid, truth in TASK1_GROUND_TRUTH.items():
@@ -109,7 +109,17 @@ def grade_task1(actions_log: List[Dict[str, Any]]) -> float:
         pri_ok  = classified[eid].get("priority") == truth["priority"]
         total_score += 0.6 * cat_ok + 0.4 * pri_ok
 
-    return round(total_score / len(TASK1_GROUND_TRUTH), 4)
+    # return round(total_score / len(TASK1_GROUND_TRUTH), 4)
+    score = total_score / len(TASK1_GROUND_TRUTH)
+
+    # Clamp score into (0,1)
+    if score <= 0.0:
+        score = 0.01
+    elif score >= 1.0:
+        score = 0.99
+    if score == 0.0:
+        score = 0.01
+    return round(score, 4)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -233,7 +243,7 @@ def grade_task2(actions_log: List[Dict[str, Any]]) -> float:
             keywords = REPLY_KEYWORDS.get(eid, [])
             if keywords:
                 hits = sum(1 for kw in keywords if kw in replies[eid])
-                email_score += 0.40 * (hits / len(keywords))
+                email_score += 0.40 * (hits / len(keywords) )
         elif not truth["needs_reply"] and eid not in replies:
             email_score += 0.40  # correctly did NOT reply to spam/test
 
@@ -244,7 +254,9 @@ def grade_task2(actions_log: List[Dict[str, Any]]) -> float:
             email_score += 0.20
 
         score += email_score * weight_per_email
-
+    score = min(max(score, 0.01), 0.99)
+    if score == 0.0:
+        score = 0.01
     return round(score, 4)
 
 
@@ -419,6 +431,13 @@ def grade_task3(actions_log: List[Dict[str, Any]]) -> float:
             e_score += 0.20
 
         score += e_score / n
+
+
+    # Clamp score into (0,1)
+    if score <= 0.0:
+        score = 0.01
+    elif score >= 1.0:
+        score = 0.99
 
     return round(score, 4)
 
