@@ -1,28 +1,37 @@
 """
-server.py
----------
-FastAPI server exposing the EmailTriageEnv over HTTP.
-This is the OpenEnv environment server — the inference script calls it.
+server/app.py
+-------------
+FastAPI environment server — canonical location required by openenv validate.
+Entry point registered in pyproject.toml as:
+  [project.scripts]
+  serve = "server.app:main"
 
 Endpoints:
-  POST /reset          → Observation
-  POST /step           → StepResult
-  GET  /state          → dict
-  POST /close          → {"status": "closed"}
-  GET  /tasks          → list of available task names
-  GET  /health         → {"status": "ok"}
+  GET  /health   → {"status": "ok"}
+  GET  /tasks    → task metadata
+  POST /reset    → Observation
+  POST /step     → {observation, reward, done, info}
+  GET  /state    → current env state dict
+  POST /close    → {"status": "closed", "final_score": float}
 """
 
 from __future__ import annotations
 import os
+import sys
 from typing import Optional
+
+# Ensure project root is on sys.path so `env.*` imports work whether
+# run as `python server/app.py` or via the installed `serve` script.
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from env.environment import EmailTriageEnv
-from env.models import Action, Observation, StepResult
+from env.models import Action, Observation
 
 app = FastAPI(
     title="Email Triage OpenEnv",
@@ -37,22 +46,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global environment instance (one per server process)
+# One environment instance per server process
 _env: Optional[EmailTriageEnv] = None
 
 
 # ── Request bodies ────────────────────────────────────────────────────────────
 
 class ResetRequest(BaseModel):
-    task_name: str = "email-triage-easy"
+    task_name: Optional[str]=None
+    task:Optional[str]=None
 
 
 class StepRequest(BaseModel):
     action: Action
 
-@app.get("/")
-def root():
-    return {"message": "Email Triage OpenEnv Environment Running"}
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -65,9 +73,9 @@ def list_tasks():
     from env.tasks import TASKS
     return {
         name: {
-            "difficulty": t.difficulty,
-            "max_steps":  t.max_steps,
-            "num_emails": len(t.emails),
+            "difficulty":  t.difficulty,
+            "max_steps":   t.max_steps,
+            "num_emails":  len(t.emails),
             "description": t.description[:120] + "...",
         }
         for name, t in TASKS.items()
@@ -75,10 +83,15 @@ def list_tasks():
 
 
 @app.post("/reset", response_model=Observation)
-def reset(req: ResetRequest):
+def reset(req: Optional[ResetRequest]=None):
     global _env
+    # handle cases where no body is sent
+    task_name = "email-triage-easy"
+
+    if req:
+        task_name = req.task_name or req.task or task_name
     try:
-        _env = EmailTriageEnv(task_name=req.task_name)
+        _env = EmailTriageEnv(task_name=task_name)
         obs  = _env.reset()
         return obs
     except ValueError as exc:
@@ -89,8 +102,10 @@ def reset(req: ResetRequest):
 def step(req: StepRequest):
     global _env
     if _env is None:
-        raise HTTPException(status_code=400,
-                            detail="Environment not initialized. Call /reset first.")
+        raise HTTPException(
+            status_code=400,
+            detail="Environment not initialized. Call /reset first.",
+        )
     try:
         obs, reward, done, info = _env.step(req.action)
         return {
@@ -109,8 +124,10 @@ def step(req: StepRequest):
 def state():
     global _env
     if _env is None:
-        raise HTTPException(status_code=400,
-                            detail="Environment not initialized. Call /reset first.")
+        raise HTTPException(
+            status_code=400,
+            detail="Environment not initialized. Call /reset first.",
+        )
     return _env.state()
 
 
@@ -125,7 +142,18 @@ def close():
     return {"status": "closed", "final_score": round(score, 4)}
 
 
-if __name__ == "__main__":
+# ── Entry point registered in pyproject.toml [project.scripts] ───────────────
+
+def main():
     import uvicorn
     port = int(os.getenv("PORT", 7860))
-    uvicorn.run("server:app", host="0.0.0.0", port=port, reload=False)
+    uvicorn.run(
+        "server.app:app",
+        host="0.0.0.0",
+        port=port,
+        reload=False,
+    )
+
+
+if __name__ == "__main__":
+    main()
