@@ -119,7 +119,7 @@ def grade_task1(actions_log: List[Dict[str, Any]]) -> float:
         score = 0.99
     if score == 0.0:
         score = 0.01
-    return round(score, 4)
+    return float(f"{score:.4f}")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -257,7 +257,7 @@ def grade_task2(actions_log: List[Dict[str, Any]]) -> float:
     score = min(max(score, 0.01), 0.99)
     if score == 0.0:
         score = 0.01
-    return round(score, 4)
+    return float(f"{score:.4f}")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -439,8 +439,7 @@ def grade_task3(actions_log: List[Dict[str, Any]]) -> float:
     elif score >= 1.0:
         score = 0.99
 
-    return round(score, 4)
-
+    return float(f"{score:.4f}")
 
 # ─────────────────────────────────────────────────────────────
 #  Task registry
