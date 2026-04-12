@@ -8,6 +8,18 @@ app_file: server.py
 pinned: false
 ---
 
+
+## 🌐 Live Demo
+
+Hugging Face Space:
+https://huggingface.co/spaces/saiKiran112201044/email-triage-openenv
+
+API Endpoint:
+https://saikiran112201044-email-triage-openenv.hf.space
+
+Example health check:
+https://saikiran112201044-email-triage-openenv.hf.space/health
+
 # 📧 Email Triage — OpenEnv RL Environment
 
 A real-world email triage environment for the Meta OpenEnv RL Hackathon.
